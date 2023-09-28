@@ -1,2 +1,2 @@
 # vp23
-Veebiprogrammeerimise kursuse repositoorium
+Veebiprogrammeerimise kursuse repositoorium.
