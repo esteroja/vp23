@@ -3,6 +3,7 @@ const dateTime = require('./datetime_et');
 const url = require("url");
 const path  = require("path"); //haagime kõlge serveerile failitee
 const fs = require("fs"); //see moodul täis asju mis oskavad kasutada failisüsteeme, nt faili lugeda kirjutada jne
+const querystring = require('querystring');
 
 const pageHead = '<!DOCTYPE html>\n<html>\n<head>\n\t<meta charset="utf-8"><title>Ester Ojala, veebiprogrammeerimine 2023</title></head><body>';
 const pageBanner = '\n\t<img src="banner.png" alt="Kursuse banner">';
@@ -30,8 +31,37 @@ function semProgressValue() {
     }
     return semValue;
 }
-http.createServer(function(req, res){ //request, response/result
+
+http.createServer(function(req, res) { //request, response/result
     let currentURL = url.parse(req.url, true); //parsimine on andmete lahtiharutamine, req on päring
+    if(req.method ==='POST'){
+        collectRequestData(req, result => {
+            console.log(result);
+            //kirjutame andmeid tekstifaili
+            fs.open('public/log.txt', 'a', (err, file) => {//a-> kui faili pole olemas siis see luuakse
+                if (err) {
+                    throw err;
+                }
+                else {
+                    fs.appendFile('public/log.txt', result.firstNameInput + ';', (err)=>{
+                        if (err) {
+                            throw err;
+                        }
+                        else {
+                            console.log("Faili kirjutati");
+                        }
+                    }); //fs.appendFile kirjutab faili lõppu teksti juurde
+                }
+                fs.close(file, (err)=>{
+                    if (err) {
+                        throw err;
+                    }
+                });
+            }); 
+            res.end(result.firstNameInput);
+        });
+    }
+
     if (currentURL.pathname === "/") {
         res.writeHead(200, {"Content-type": "text/html"});
         res.write(pageHead);
@@ -50,7 +80,7 @@ http.createServer(function(req, res){ //request, response/result
         res.write(pageBanner)
         res.write(pageBody);
         res.write('\n\t<hr>\n\t<h2>Lisa palun oma nimi!</h2>');
-        res.write('\n\t<p>Edaspidi lisame siia oma asju</p>');
+        res.write('\n\t<p><form  method="POST"><label for="firstNameInput">Eesnimi: </label><br><input type="text" name="firstNameInput" id="firstNameInput" placeholder="Sinu eesnimi ..."><br><label for="lastNameInput">Perekonnanimi: </label><br><input type="text" name="lastNameInput" id="lastNameInput" placeholder="Sinu perekonnanimi ..."><br><input type="submit" name="nameSubmit" value="Salvesta"></form></p>');
         res.write(pageFoot);
         return res.end();
     }
@@ -68,14 +98,28 @@ http.createServer(function(req, res){ //request, response/result
     }
 
     else if (currentURL.pathname === "/tluPhoto") {
-        res.writeHead(200, {"Content-type": "text/html"});
-        res.write(pageHead);
-        res.write(pageBanner);
-        res.write(pageBody);
-        res.write('\n\t<hr>Tallinna Ülikooli Terra maja esiuks</h2>');
-        res.write('\n\t<img src="tlu_42.jpg" alt="Tallinna Ülikooli Terra maja esiuks">');
-        res.write(pageFoot);
-        return res.end();
+        //loeme kataloogist fotode nimekirja ja loosime ühe pildi
+        let htmlOutPut = '\n\t<p>Pilti ei saa näidata</p>';
+        let listOutPut = '';
+        fs.readdir('public/tluphotos', (err, fileList)=>{ //loeb kataloogi, callbacki asjad, kas on mingi error, mis on koha nimi kust failid tulevad(filelist)
+            if (err) {
+                throw err;
+                tluPhotoPage(res, htmlOutPut); //paned sulgudesse need, et saadab need infod ära alla functsiooni, kus need kinni püütakse
+            }
+            else {
+                //console.log(fileList);
+                let photoNum = Math.floor(Math.random() * fileList.length); //filelisti suvalise pildi leidmine, 0st 42ni juhuslik arv
+                htmlOutPut = '\n\t<img src="' + fileList[photoNum] + '" alt="TLÜ pilt">';
+                //console.log(htmlOutPut);
+                listOutPut = '\n\t<ul>';
+                for (element of fileList) {
+                    listOutPut += '\n\t<li>' + element + '</li>';
+                }
+                listOutPut += '\n\t</ul>';
+                tluPhotoPage(res, htmlOutPut, listOutPut);
+            }
+        });
+        
     }
 
     else if (currentURL.pathname === "/banner.png") {
@@ -92,7 +136,8 @@ http.createServer(function(req, res){ //request, response/result
         });
     }
 
-    else if (currentURL.pathname === "/tlu_42.jpg") {
+    else if (path.extname(currentURL.pathname) === ".jpg") {
+        console.log(path.extname(currentURL.pathname)); //extname sõelub välja punkti ja jpg
         let photoPath = path.join(__dirname, "public", "tluphotos"); //dirname on path mooduliga sisseehitatud muutuja mis tähistab selle lehe failiteed(kaldkriipsuleht). kaldkriipsu pole juurde vaja kirjutada sest juurkataloog ise on nagu kaldkriips
         fs.readFile(photoPath + currentURL.pathname, (err, data)=> { //currentUrl.pathname asemel võib panna "/banner.png"
             if (err) {
@@ -111,3 +156,37 @@ http.createServer(function(req, res){ //request, response/result
     //valmis, saada ära
 }).listen(5128); //pordi number mida kuulad(?), pm veebilehe teemiseks
 //link on greeny.cs.tlu.ee:5128, vaja enne puttys kirjutada node www2.js
+
+
+function tluPhotoPage(res, htmlOutPut, listOutPut) { //püütakse varem saadetud info kinni
+    res.writeHead(200, {"Content-type": "text/html"});
+    res.write(pageHead);
+    res.write(pageBanner);
+    res.write(pageBody);
+    res.write('\n\t<h2>Tallinna Ülikooli pilt</h2>');
+    res.write(htmlOutPut);
+    if(listOutPut != ''){
+        res.write(listOutPut);
+    }
+    res.write('\n\t<img src="tlu_42.jpg" alt="Tallinna Ülikooli pilt">');
+    res.write(pageFoot);
+    return res.end();
+}
+
+function collectRequestData(request, callback) {
+    const FORM_URLENCODED = 'application/x-www-form-urlencoded';
+    if(request.headers['content-type'] === FORM_URLENCODED) {
+        let receivedData = '';
+        request.on('data', chunk => {
+            receivedData += chunk.toString();
+        });
+        request.on('end', () => {
+            callback(querystring.decode(receivedData));
+        });
+    }
+    else {
+        callback(null);
+    }
+}
+
+//KODUS: peab tegema lehe selliseks et tekstifaili salvestatakse nt "eesnimi, perekonnanimi,kuupäev millal inimene salvestas", tuleb date muuta eestipäraseks (vanasõnade splittimise järgi sqaab teha, võib tulla massiiv kus sees on veel massiiv, names[0],names[1]-> perekonnanimi[0][1])
