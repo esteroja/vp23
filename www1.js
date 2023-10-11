@@ -34,6 +34,9 @@ function semProgressValue() {
 
 http.createServer(function(req, res) { //request, response/result
     let currentURL = url.parse(req.url, true); //parsimine on andmete lahtiharutamine, req on päring
+    const months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+    let dateEN = new Date();
+    let dateENformatted = months[dateEN.getMonth()] + "/" + dateEN.getDate() + "/" + dateEN.getFullYear();
     if(req.method ==='POST'){
         collectRequestData(req, result => {
             console.log(result);
@@ -43,7 +46,7 @@ http.createServer(function(req, res) { //request, response/result
                     throw err;
                 }
                 else {
-                    fs.appendFile('public/log.txt', result.firstNameInput + ';', (err)=>{
+                    fs.appendFile('public/log.txt', result.firstNameInput + ',' + result.lastNameInput + ',' + dateENformatted + ";\n", (err)=>{
                         if (err) {
                             throw err;
                         }
@@ -57,8 +60,8 @@ http.createServer(function(req, res) { //request, response/result
                         throw err;
                     }
                 });
-            }); 
-            res.end(result.firstNameInput);
+            });
+            res.end();
         });
     }
 
@@ -70,17 +73,33 @@ http.createServer(function(req, res) { //request, response/result
         res.write('\n\t<hr>\n\t<a href="addName">Lisa oma nimi</a>');
         res.write('\n\t<hr>\n\t<a href="semProgress">Semestri progress</a>');
         res.write('\n\t<hr>\n\t<a href="tluPhoto">Pilt TLÜ Terra hoonest</a>');
+        res.write('\n\t<hr>\n\t<a href="txtFile">Salvestatud nimed</a>');
         res.write(pageFoot);
         return res.end();
     }
 
     else if (currentURL.pathname === "/addName") {
+        //const nameFormDivBody= "<p>Nimi salvestatud</p><a href=\\'/addName\\'>Naase lehe algversioonile</a>";
+        //`<form method="POST" onsubmit="document.getElementById('name-form').innerHTML='${nameFormDivBody}'">`
+
         res.writeHead(200, {"Content-type": "text/html"});
         res.write(pageHead);
         res.write(pageBanner)
         res.write(pageBody);
         res.write('\n\t<hr>\n\t<h2>Lisa palun oma nimi!</h2>');
-        res.write('\n\t<p><form  method="POST"><label for="firstNameInput">Eesnimi: </label><br><input type="text" name="firstNameInput" id="firstNameInput" placeholder="Sinu eesnimi ..."><br><label for="lastNameInput">Perekonnanimi: </label><br><input type="text" name="lastNameInput" id="lastNameInput" placeholder="Sinu perekonnanimi ..."><br><input type="submit" name="nameSubmit" value="Salvesta"></form></p>');
+        res.write('\n\t<div id="name-form">' +
+            '<form method="POST">' +
+            '<label for="firstNameInput">Eesnimi: </label>' +
+            '<br>' +
+            '<input type="text" name="firstNameInput" id="firstNameInput" placeholder="Sinu eesnimi ...">' +
+            '<br>' +
+            '<label for="lastNameInput">Perekonnanimi: </label>' +
+            '<br>' +
+            '<input type="text" name="lastNameInput" id="lastNameInput" placeholder="Sinu perekonnanimi ...">' +
+            '<br>' +
+            '<input type="submit" name="nameSubmit" value="Salvesta"></form>' +
+            '</div>');
+        res.write('\n\t <p><a href="/">Tagasi avalehele</a>!</p>');
         res.write(pageFoot);
         return res.end();
     }
@@ -93,6 +112,7 @@ http.createServer(function(req, res) { //request, response/result
         res.write('\n\t<hr><h2>Semestri progress</h2>');
         let semProgressCall = semProgressValue();
         res.write(semProgressCall);
+        res.write('\n\t <p><a href="/">Tagasi avalehele</a>!</p>');
         res.write(pageFoot);
         return res.end();
     }
@@ -119,7 +139,27 @@ http.createServer(function(req, res) { //request, response/result
                 tluPhotoPage(res, htmlOutPut, listOutPut);
             }
         });
-        
+
+    }
+
+    else if (currentURL.pathname === "/txtFile") {
+        res.writeHead(200, {"Content-type": "text/html"});
+        res.write(pageHead);
+        res.write(pageBanner);
+        res.write(pageBody);
+        res.write('\n\t<hr><h2>Registreeritud inimesed</h2>');
+        let dataList = [];
+        let data = fs.readFileSync("public/log.txt", "utf8");
+        let sortedData = data.split(";");
+        for (let i = 0; i < sortedData.length; i++) {
+            let row = sortedData[i].trim().replaceAll(",", " ");
+            if (row.length > 0) {
+                dataList += '<li>' + row + '</li>';
+            }
+        }
+        res.write('<ul>' + dataList + '</ul>');
+        res.write(pageFoot);
+        return res.end();
     }
 
     else if (currentURL.pathname === "/banner.png") {
@@ -189,4 +229,13 @@ function collectRequestData(request, callback) {
     }
 }
 
-//KODUS: peab tegema lehe selliseks et tekstifaili salvestatakse nt "eesnimi, perekonnanimi,kuupäev millal inimene salvestas", tuleb date muuta eestipäraseks (vanasõnade splittimise järgi sqaab teha, võib tulla massiiv kus sees on veel massiiv, names[0],names[1]-> perekonnanimi[0][1])
+/*function dataToList() {
+    let sortedData = data.split(";");
+    for (let i = 0; i < sortedData.length; i++) {
+        dataList += '<li>' + sortedData[i] + '</li>';
+    }
+    return dataList;
+}*/
+
+//KODUS: peab tegema lehe selliseks, et tekstifaili salvestatakse nt "eesnimi, perekonnanimi,kuupäev millal inimene salvestas", tuleb date muuta eestipäraseks (vanasõnade splittimise järgi sqaab teha, võib tulla massiiv kus sees on veel massiiv, names[0],names[1]-> perekonnanimi[0][1])
+
